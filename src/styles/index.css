@@ -1,0 +1,9 @@
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+
+/* Fix for dropdown options appearing invisible due to white-on-white or transparent backgrounds */
+option {
+  background-color: #0f172a; /* slate-900 */
+  color: white;
+}
