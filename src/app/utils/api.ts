@@ -1,13 +1,13 @@
-import { projectId, publicAnonKey } from '/utils/supabase/info';
+import { supabaseUrl, supabaseKey } from '/utils/supabase/info';
 
-const API_BASE = `https://${projectId}.supabase.co/functions/v1/make-server-17668ba8`;
+const API_BASE = `${supabaseUrl}/functions/v1/make-server-17668ba8`;
 
 async function apiRequest(endpoint: string, options: RequestInit = {}) {
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${publicAnonKey}`,
+      'Authorization': `Bearer ${supabaseKey}`,
       ...options.headers,
     },
   });
