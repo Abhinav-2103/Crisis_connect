@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { chatApi, volunteersApi, needsApi } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { Send, Search, MoreVertical, Phone, Video } from 'lucide-react';
-import { mockVolunteers } from '../../data/mockData';
+import { mockVolunteers, mockNeeds } from '../../data/mockData';
 import { QueryModal } from '../modals/QueryModal';
 
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -47,7 +47,7 @@ export function ChatScreen() {
       try {
         const { needs: fetchedNeeds } = await needsApi.getAll();
         const hasNeedsData = fetchedNeeds && fetchedNeeds.length > 0;
-        const allNeeds = hasNeedsData ? fetchedNeeds : (await import('../../data/mockData')).mockNeeds;
+        const allNeeds = hasNeedsData ? fetchedNeeds : mockNeeds;
         const usersMap = new Map();
         
         // 1. Users from active Needs

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { analyticsApi, needsApi } from '../../utils/api';
-import { mockNeeds } from '../../data/mockData';
+import { mockNeeds, mockVolunteers } from '../../data/mockData';
 import { AlertCircle, Users, CheckCircle, TrendingUp } from 'lucide-react';
 import {
   LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
@@ -79,24 +79,22 @@ export function DashboardScreen() {
       if (hasData) {
         setAnalytics(analyticsData);
       } else {
-        import('../../data/mockData').then(({ mockNeeds, mockVolunteers }) => {
-          const totalNeeds = mockNeeds.length;
-          const completedNeeds = mockNeeds.filter(n => n.status === 'resolved').length;
-          setAnalytics({
-            metrics: {
-              totalNeeds,
-              activeNeeds: mockNeeds.filter(n => n.status === 'open').length,
-              completedNeeds,
-              criticalNeeds: mockNeeds.filter(n => n.urgency === 'critical').length,
-              totalVolunteers: mockVolunteers.length,
-              activeVolunteers: mockVolunteers.filter(v => v.availability === 'available').length,
-              responseRate: ((completedNeeds / totalNeeds) * 100).toFixed(1)
-            },
-            categoryData: mockNeeds.reduce((acc: any, need: any) => {
-              acc[need.category] = (acc[need.category] || 0) + 1;
-              return acc;
-            }, {})
-          });
+        const totalNeeds = mockNeeds.length;
+        const completedNeeds = mockNeeds.filter(n => n.status === 'resolved').length;
+        setAnalytics({
+          metrics: {
+            totalNeeds,
+            activeNeeds: mockNeeds.filter(n => n.status === 'open').length,
+            completedNeeds,
+            criticalNeeds: mockNeeds.filter(n => n.urgency === 'critical').length,
+            totalVolunteers: mockVolunteers.length,
+            activeVolunteers: mockVolunteers.filter(v => v.availability === 'available').length,
+            responseRate: ((completedNeeds / totalNeeds) * 100).toFixed(1)
+          },
+          categoryData: mockNeeds.reduce((acc: any, need: any) => {
+            acc[need.category] = (acc[need.category] || 0) + 1;
+            return acc;
+          }, {})
         });
       }
     } catch (error) {
