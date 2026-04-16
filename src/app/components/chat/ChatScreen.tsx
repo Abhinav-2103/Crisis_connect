@@ -1,11 +1,30 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { chatApi, volunteersApi, needsApi } from '../../utils/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { Send, Search, MoreVertical, Phone, Video } from 'lucide-react';
 import { mockVolunteers, mockNeeds } from '../../data/mockData';
 import { QueryModal } from '../modals/QueryModal';
-
 import { useNotifications } from '../../contexts/NotificationContext';
+
+// ─── Stable conversationId: sort both IDs so A↔B and B↔A share the same key ───
+// IMPORTANT: must use '-' to match keys already stored in Supabase KV (e.g. chat:user-1-vol-1:msgId)
+const makeConvId = (idA: string, idB: string) => [idA, idB].sort().join('-');
+
+// ─── LocalStorage helpers for persistent message cache ───
+const LS_KEY = (convId: string) => `cc_chat_v2_${convId}`; // v2 busts any stale '::' cache
+const readCache = (convId: string): any[] => {
+  try { return JSON.parse(localStorage.getItem(LS_KEY(convId)) || '[]'); } catch { return []; }
+};
+const writeCache = (convId: string, msgs: any[]) => {
+  try { localStorage.setItem(LS_KEY(convId), JSON.stringify(msgs)); } catch {}
+};
+const mergeMessages = (existing: any[], incoming: any[]): any[] => {
+  const map = new Map(existing.map(m => [m.id, m]));
+  incoming.forEach(m => map.set(m.id, m));
+  return Array.from(map.values()).sort(
+    (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+  );
+};
 
 export function ChatScreen() {
   const { user } = useAuth();
@@ -17,16 +36,43 @@ export function ChatScreen() {
   const [loading, setLoading] = useState(true);
   const [isQueryModalOpen, setIsQueryModalOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     loadContacts();
   }, []);
 
+  // ─── Load + poll messages whenever contact changes ───
   useEffect(() => {
-    if (selectedContact) {
-      loadMessages();
+    if (pollRef.current) clearInterval(pollRef.current);
+    if (!selectedContact || !user) return;
+
+    // Seed from cache immediately so UI is never blank
+    const convId = makeConvId(user.id, selectedContact.id);
+    const cached = readCache(convId);
+    if (cached.length > 0) setMessages(cached);
+
+    // Fetch from backend and merge
+    fetchAndMerge(convId);
+
+    // Poll every 5 seconds for replies from the other party
+    pollRef.current = setInterval(() => fetchAndMerge(convId), 5000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [selectedContact?.id]);
+
+  const fetchAndMerge = useCallback(async (convId: string) => {
+    try {
+      const { messages: remote } = await chatApi.getMessages(convId);
+      if (!remote) return;
+      setMessages(prev => {
+        const merged = mergeMessages(prev, remote);
+        writeCache(convId, merged);
+        return merged;
+      });
+    } catch {
+      // Network error — keep existing local state, don't wipe it
     }
-  }, [selectedContact]);
+  }, []);
 
   useEffect(() => {
     // Scroll to bottom when messages change
@@ -145,54 +191,45 @@ export function ChatScreen() {
   };
 
   const loadMessages = async () => {
-    if (!selectedContact || !user) return;
-    
-    try {
-      const conversationId = [user.id, selectedContact.id].sort().join('-');
-      const { messages: chatMessages } = await chatApi.getMessages(conversationId);
-      
-      // Only override if backend actually returned messages
-      if (chatMessages && chatMessages.length > 0) {
-        setMessages(chatMessages);
-      } else {
-        // If empty, keep local optimistic messages if they exist for this convo
-        setMessages(prev => prev.filter(m => m.conversationId === conversationId));
-      }
-    } catch (error) {
-      console.error('Failed to load messages:', error);
-      // Keep local messages on error
-      const conversationId = [user.id, selectedContact.id].sort().join('-');
-      setMessages(prev => prev.filter(m => m.conversationId === conversationId));
-    }
+    // Kept for backward compat but superseded by fetchAndMerge + polling above
   };
 
   const handleSend = async () => {
     if (!newMessage.trim() || !selectedContact || !user) return;
 
-    const conversationId = [user.id, selectedContact.id].sort().join('-');
+    const convId = makeConvId(user.id, selectedContact.id);
     const textEntry = newMessage.trim();
     setNewMessage('');
 
-    // Optimistically update UI
+    // 1. Optimistic update — show instantly, persist to cache
     const tempMsg = {
       id: `local-${Date.now()}`,
-      conversationId,
+      conversationId: convId,
       senderId: user.id,
       text: textEntry,
       timestamp: new Date().toISOString()
     };
-    setMessages(prev => [...prev, tempMsg]);
+    setMessages(prev => {
+      const next = mergeMessages(prev, [tempMsg]);
+      writeCache(convId, next);
+      return next;
+    });
 
     try {
-      await chatApi.sendMessage(conversationId, user.id, textEntry);
-      // Only reload from backend if we believe it succeeded
-      const { messages: chatMessages } = await chatApi.getMessages(conversationId);
-      if (chatMessages && chatMessages.length > 0) {
-        setMessages(chatMessages);
+      // 2. Persist to backend
+      const { message: saved } = await chatApi.sendMessage(convId, user.id, textEntry);
+      if (saved) {
+        // Replace the temp local message with the server-confirmed version
+        setMessages(prev => {
+          const without = prev.filter(m => m.id !== tempMsg.id);
+          const next = mergeMessages(without, [saved]);
+          writeCache(convId, next);
+          return next;
+        });
       }
     } catch (error) {
-      console.error('Failed to send message via API:', error);
-      // Message remains in local state organically!
+      console.error('Failed to send message via API — message stays in local cache:', error);
+      // tempMsg is already in cache; nothing more to do
     }
   };
 

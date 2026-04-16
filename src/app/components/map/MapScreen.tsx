@@ -63,15 +63,31 @@ const markerColorMap: Record<string, string> = {
 };
 
 const ngoColorMap: Record<string, string> = {
-  'ngo-1': '#a855f7',
-  'ngo-2': '#3b82f6',
-  'ngo-3': '#10b981',
-  'ngo-4': '#f59e0b',
+  'ngo-1':  '#a855f7', // Prayas Foundation – Delhi
+  'ngo-2':  '#3b82f6', // Sahyog Relief Trust – Mumbai
+  'ngo-3':  '#10b981', // Seva Samithi – Bangalore
+  'ngo-4':  '#f59e0b', // Aasra Welfare Society – Noida/Delhi
+  'ngo-5':  '#ef4444', // Kolkata Aid
+  'ngo-6':  '#06b6d4', // Chennai Rescue
+  'ngo-7':  '#ec4899', // Pune Health Initiative
+  'ngo-8':  '#eab308', // Rajputana Relief – Jaipur
+  'ngo-9':  '#8b5cf6', // Awadh Care – Lucknow
+  'ngo-10': '#14b8a6', // Gujjar Volunteers – Ahmedabad
+  'ngo-11': '#f97316', // Mumbai Disaster Cell
+  'ngo-12': '#22d3ee', // Namma Bengaluru Relief
+  'ngo-13': '#fb7185', // Sundarbans Seva Dal – Kolkata
+  'ngo-14': '#818cf8', // Tamil Nadu Relief Corps – Chennai
+  'ngo-15': '#a3e635', // Deccan Relief Force – Hyderabad
+  'ngo-16': '#fbbf24', // Telangana Yuvashakti – Hyderabad
+  'ngo-17': '#34d399', // Bhopal Jan Seva
+  'ngo-18': '#60a5fa', // Patna Flood Watch
+  'ngo-19': '#f87171', // Assam Aapda Seva – Guwahati
+  'ngo-20': '#c084fc', // Jharkhand Rescue Net – Ranchi
 };
 
 function createNeedEmojiIcon(category: string, urgencyColor: string) {
   const categoryIcons: Record<string, string> = {
-    Medical: '🏥', Food: '🍱', Water: '💧', Shelter: '🏕️', Transport: '🚐', Rescue: '🆘',
+    Medical: '🏥', Food: '🍱', Water: '💧', Shelter: '🏠', Transport: '🚑', Rescue: '🆘',
   };
   const emoji = categoryIcons[category] || '📍';
   return L.divIcon({
@@ -267,9 +283,9 @@ export function MapScreen() {
       maxZoom: 20,
     }).addTo(map);
 
-    const markersLayer = L.layerGroup().addTo(map);
-    const volunteerLayer = L.layerGroup().addTo(map);
     const coverageLayer = L.layerGroup().addTo(map);
+    const volunteerLayer = L.layerGroup().addTo(map);
+    const markersLayer = L.layerGroup().addTo(map);
     markersLayerRef.current = markersLayer;
     volunteerLayerRef.current = volunteerLayer;
     coverageLayerRef.current = coverageLayer;
@@ -303,7 +319,14 @@ export function MapScreen() {
       const marker = L.marker([need.lat, need.lng], { icon }).on('click', () => {
         setSelectedNeed(need);
         mapInstanceRef.current?.panTo([need.lat!, need.lng!]);
-      });
+      }).bindPopup(`
+        <div style="font-family:inherit;min-width:180px;">
+          <div style="font-weight:600;font-size:14px;margin-bottom:4px;color:#1e293b">${need.title}</div>
+          <div style="font-size:12px;color:#475569;margin-bottom:2px"><b>Category:</b> ${need.category}</div>
+          <div style="font-size:12px;color:#475569;margin-bottom:2px"><b>Location:</b> ${need.location}</div>
+          <div style="font-size:12px;color:${color};font-weight:700;text-transform:uppercase;margin-top:6px">${need.urgency}</div>
+        </div>
+      `);
       marker.addTo(markersLayerRef.current!);
     });
   };
@@ -358,13 +381,20 @@ export function MapScreen() {
       setLoading(true);
       const filters: any = { status: 'open' };
       if (selectedCategory !== 'All') filters.category = selectedCategory;
-      let data: Need[] = [];
+      let rawFetched: Need[] = [];
       try {
         const { needs: fetched } = await needsApi.getAll(filters);
-        data = fetched?.length ? fetched : mockNeeds;
-      } catch {
-        data = mockNeeds;
+        rawFetched = fetched || [];
+      } catch (err) {
+        console.error('Failed fetching live needs API, falling back safely:', err);
       }
+      
+      const allNeeds = [...mockNeeds, ...rawFetched];
+      const uniqueNeeds = Array.from(new Map(allNeeds.map(n => [n.id, n])).values());
+      
+      data = uniqueNeeds;
+      if (filters.status) data = data.filter(n => n.status === filters.status);
+      if (filters.category) data = data.filter(n => n.category === filters.category);
       setNeeds(data);
     } catch (error) {
       console.error('Failed to load needs:', error);
