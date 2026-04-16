@@ -61,6 +61,7 @@ export function Layout() {
     <div className="dark min-h-screen bg-gradient-to-br from-slate-950 via-purple-950/40 to-slate-950 text-white">
       {/* Sidebar */}
       <aside className="fixed left-0 top-0 h-full w-64 border-r border-white/20 backdrop-blur-xl bg-slate-900/80 z-10 flex flex-col">
+        {/* Logo — never shrinks */}
         <div className="p-6 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-blue-600 flex items-center justify-center">
@@ -73,7 +74,8 @@ export function Layout() {
           </div>
         </div>
 
-        <nav className="flex-1 overflow-y-auto px-6 space-y-2 min-h-0">
+        {/* Nav — scrolls when there are many items */}
+        <nav className="flex-1 min-h-0 overflow-y-auto px-6 space-y-2 pb-2">
           {navigation.map((item) => {
             const isActive = location.pathname === item.path;
             return (
@@ -93,8 +95,9 @@ export function Layout() {
           })}
         </nav>
 
-        <div className="p-6 flex-shrink-0 space-y-3">
-          {/* Logout Button */}
+        {/* Bottom section — always pinned to bottom, never pushed off-screen */}
+        <div className="flex-shrink-0 px-6 pb-6 pt-3 space-y-3 border-t border-white/10">
+          {/* Logout Button — always visible */}
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-gray-400 hover:text-white hover:bg-red-500/20 hover:border-red-500/50 border border-white/20 transition-all duration-200"
@@ -103,10 +106,11 @@ export function Layout() {
             <span>Logout</span>
           </button>
 
-          <div className="p-4 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-purple-500/40">
+          {/* Promo card — hidden on very short viewports via CSS */}
+          <div className="hidden sm:block p-4 rounded-xl bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-purple-500/40">
             <p className="text-sm text-gray-300 mb-2">
-              {user?.role === 'volunteer' ? 'Help people in need' : 
-               user?.role === 'user' ? 'Get help quickly' : 
+              {user?.role === 'volunteer' ? 'Help people in need' :
+               user?.role === 'user' ? 'Get help quickly' :
                'Coordinate emergency response'}
             </p>
             <p className="text-xs text-gray-400">Connect with {user?.role === 'user' ? 'volunteers' : 'people'} in your area instantly.</p>
